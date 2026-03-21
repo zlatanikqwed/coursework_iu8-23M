@@ -1,0 +1,32 @@
+# LLM Pentest Toolkit
+target:
+  # Провайдер: openai, ollama, anthropic. litellm
+  provider: "ollama"
+  model: "llama3.1:8b"
+  base_url: "http://localhost:11434"
+  api_key: ""
+  temperature: 0.7
+  max_tokens: 1024
+  system_prompt: "You are a helpful assistant."
+
+scan:
+  modules:
+    - "prompt_injection"
+    - "sensitive_info"
+    - "output_handling"
+    - "system_prompt_leakage"
+  max_concurrent: 3
+  timeout: 30
+
+report:
+  output_dir: "./reports"
+  formats:
+    - "json"
+    - "html"
+
+payloads:
+  custom_dir: "./payloads"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
