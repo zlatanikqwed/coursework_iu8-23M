@@ -101,7 +101,7 @@ def test_analyze_only():
         result = module.analyze_response(payload, response_text)
         status = "VULNERABLE" if result.vulnerable else "SAFE"
         match = "ОК" if result.vulnerable == expected_vulnerable else "MISMATCH"
-        print(f"  {match} Response: \"{response_text[:50]}...\" → {status}")
+        print(f"  {match} Response: \"{response_text[:50]}...\" - {status}")
 
 
 if __name__ == "__main__":
