@@ -50,7 +50,7 @@ def make_report(results: list[AttackResult]) -> ScanReport:
 
 
 class TestResponseAnalyzer:
-    def test_пустая_сводка(self):
+    def test_empty(self):
         analyzer = ResponseAnalyzer()
         summary = analyzer.build_summary()
         assert summary["total_payloads"] == 0
@@ -58,12 +58,12 @@ class TestResponseAnalyzer:
         assert summary["risk_score"] == 0.0
         assert summary["risk_level"] == "SAFE"
 
-    def test_добавление_результатов(self):
+    def test_add_res(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result(), make_result(payload_id="TEST-002")])
         assert len(analyzer.results) == 2
 
-    def test_подсчёт_уязвимостей(self):
+    def test_count_vuln(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(vulnerable=True),
@@ -72,14 +72,14 @@ class TestResponseAnalyzer:
         summary = analyzer.build_summary()
         assert summary["total_vulnerabilities"] == 1
 
-    def test_критический_риск(self):
+    def test_risk(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result(severity=SeverityLevel.CRITICAL)] * 3)
         summary = analyzer.build_summary()
         assert summary["risk_score"] > 0
         assert summary["risk_level"] in ("CRITICAL", "HIGH")
 
-    def test_разбивка_по_серьёзности(self):
+    def test_for_level(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(severity=SeverityLevel.HIGH),
@@ -89,7 +89,7 @@ class TestResponseAnalyzer:
         assert summary["by_severity"]["high"] == 1
         assert summary["by_severity"]["medium"] == 1
 
-    def test_топ_находки_отсортированы(self):
+    def test_top_sort(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(payload_id="LOW",  severity=SeverityLevel.LOW),
@@ -116,7 +116,7 @@ class TestResponseAnalyzer:
         assert report.total_vulnerabilities == 1
         assert "risk_level" in report.summary
 
-    def test_очистка_результатов(self):
+    def test_clean_res(self):
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result()])
         analyzer.clear()
@@ -125,7 +125,7 @@ class TestResponseAnalyzer:
         assert summary["total_payloads"] == 0
 
 class TestReportGenerator:
-    def test_генерация_json(self, tmp_path):
+    def test_generation_json(self, tmp_path):
         report = make_report([
             make_result(),
             make_result(payload_id="002", vulnerable=False),
@@ -139,7 +139,7 @@ class TestReportGenerator:
         assert data["scan_id"] == "test-scan-1234"
         assert data["total_vulnerabilities"] == 1
 
-    def test_генерация_html(self, tmp_path):
+    def test_generation_html(self, tmp_path):
         report = make_report([make_result(severity=SeverityLevel.CRITICAL)])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["html"])
@@ -149,7 +149,7 @@ class TestReportGenerator:
         assert "LLM Pentest Report" in content
         assert "VULNERABLE" in content
 
-    def test_оба_формата(self, tmp_path):
+    def test_all(self, tmp_path):
         report = make_report([make_result()])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["json", "html"])
@@ -157,14 +157,14 @@ class TestReportGenerator:
         assert paths["json"].exists()
         assert paths["html"].exists()
 
-    def test_создание_директории(self, tmp_path):
+    def test_creat_directory(self, tmp_path):
         target = tmp_path / "nested" / "reports"
         report = make_report([])
         gen = ReportGenerator(output_dir=str(target))
         gen.generate(report, formats=["json"])
         assert target.exists()
 
-    def test_неизвестный_формат_пропускается(self, tmp_path):
+    def test_unknown_format(self, tmp_path):
         report = make_report([])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["xml"])
