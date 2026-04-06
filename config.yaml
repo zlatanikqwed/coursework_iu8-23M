@@ -1,6 +1,6 @@
 # LLM Pentest Toolkit
 target:
-  # Провайдер: openai, ollama, anthropic. litellm
+  # openai, ollama, anthropic. litellm
   provider: "ollama"
   model: "llama3.1:8b"
   base_url: "http://localhost:11434"
@@ -16,7 +16,7 @@ scan:
     - "output_handling"
     - "system_prompt_leakage"
   max_concurrent: 3
-  timeout: 30
+  timeout: 120
 
 report:
   output_dir: "./reports"
