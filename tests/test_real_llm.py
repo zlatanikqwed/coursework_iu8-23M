@@ -1,9 +1,9 @@
 """Full integration test against a real LLM.
 
-    python tests/test_real_llm.py
-    python tests/test_real_llm.py --model llama3.1:8b --provider ollama
-    python tests/test_real_llm.py --modules prompt_injection system_prompt_leakage
-    python tests/test_real_llm.py --concurrent --output-dir ./reports
+python tests/test_real_llm.py
+python tests/test_real_llm.py --model llama3.1:8b --provider ollama
+python tests/test_real_llm.py --modules prompt_injection system_prompt_leakage
+python tests/test_real_llm.py --concurrent --output-dir ./reports
 """
 
 from __future__ import annotations
@@ -25,13 +25,13 @@ from llm_pentest.orchestrator import ScanOrchestrator
 from llm_pentest.report import ReportGenerator
 
 # ANSI colour helpers
-RESET  = "\033[0m"
-RED    = "\033[91m"
-GREEN  = "\033[92m"
+RESET = "\033[0m"
+RED = "\033[91m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-CYAN   = "\033[96m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
+CYAN = "\033[96m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
 
 
 def col(text: str, code: str) -> str:
@@ -49,25 +49,24 @@ def _status(vulnerable: bool) -> str:
 def _severity(sev: SeverityLevel) -> str:
     colour = {
         SeverityLevel.CRITICAL: RED,
-        SeverityLevel.HIGH:     RED,
-        SeverityLevel.MEDIUM:   YELLOW,
-        SeverityLevel.LOW:      GREEN,
-        SeverityLevel.INFO:     DIM,
+        SeverityLevel.HIGH: RED,
+        SeverityLevel.MEDIUM: YELLOW,
+        SeverityLevel.LOW: GREEN,
+        SeverityLevel.INFO: DIM,
     }.get(sev, "")
     return col(sev.value.upper(), colour)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="LLM Pentest - Full integration test"
-    )
+    parser = argparse.ArgumentParser(description="LLM Pentest - Full integration test")
     parser.add_argument("--config", "-c", default=None, help="Path to config.yaml")
     parser.add_argument("--provider", default="ollama", help="LLM provider")
     parser.add_argument("--model", default="llama3.1:8b", help="Model name")
     parser.add_argument("--base-url", default="http://localhost:11434", help="API base URL")
     parser.add_argument("--api-key", default="", help="API key (if required)")
     parser.add_argument(
-        "--modules", "-m",
+        "--modules",
+        "-m",
         nargs="+",
         choices=[m.value for m in ModuleName],
         default=None,
@@ -135,12 +134,10 @@ def main() -> None:
     print(f"  Smoke test response: {col(smoke[:80], DIM)}\n")
 
     # Run scan
-    selected_modules = (
-        [ModuleName(m) for m in args.modules] if args.modules else None
-    )
+    selected_modules = [ModuleName(m) for m in args.modules] if args.modules else None
 
     print(col("Starting scan...", BOLD))
-    started = datetime.datetime.now(datetime.timezone.utc)
+    started = datetime.datetime.now(datetime.UTC)
 
     report = orchestrator.run(
         modules=selected_modules,
@@ -148,7 +145,7 @@ def main() -> None:
         concurrent=args.concurrent,
     )
 
-    elapsed = (datetime.datetime.now(datetime.timezone.utc) - started).total_seconds()
+    elapsed = (datetime.datetime.now(datetime.UTC) - started).total_seconds()
 
     # Per-result output
     current_module: str | None = None
@@ -194,8 +191,11 @@ def main() -> None:
     print()
     print("  By severity:")
     labels = {
-        "critical": "Critical", "high": "High  ",
-        "medium":   "Medium ", "low":  "Low   ", "info": "Info  ",
+        "critical": "Critical",
+        "high": "High  ",
+        "medium": "Medium ",
+        "low": "Low   ",
+        "info": "Info  ",
     }
     for sev, count in summary.get("by_severity", {}).items():
         if count:
@@ -216,10 +216,7 @@ def main() -> None:
         for finding in top:
             sev = finding["severity"].upper()
             sev_col = RED if sev in ("CRITICAL", "HIGH") else YELLOW
-            print(
-                f"    [{finding['payload_id']}] {finding['name']:<38} "
-                f"{col(sev, sev_col)}"
-            )
+            print(f"    [{finding['payload_id']}] {finding['name']:<38} {col(sev, sev_col)}")
 
     sep("=")
 

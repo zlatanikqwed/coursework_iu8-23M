@@ -1,6 +1,6 @@
 """Tests for ResponseAnalyzer and ReportGenerator.
 
-    pytest tests/test_analyzer.py -v
+pytest tests/test_analyzer.py -v
 """
 
 from __future__ import annotations
@@ -46,13 +46,12 @@ def make_report(results: list[AttackResult]) -> ScanReport:
     report = ScanReport(
         scan_id="test-scan-1234",
         target_model="fake-model",
-        started_at=datetime.datetime.now(datetime.timezone.utc),
-        finished_at=datetime.datetime.now(datetime.timezone.utc),
+        started_at=datetime.datetime.now(datetime.UTC),
+        finished_at=datetime.datetime.now(datetime.UTC),
         status=ScanStatus.COMPLETED,
     )
     analyzer.apply_to_report(report)
     return report
-
 
 
 class TestResponseAnalyzer:
@@ -71,10 +70,12 @@ class TestResponseAnalyzer:
 
     def test_count_vulnerabilities(self) -> None:
         analyzer = ResponseAnalyzer()
-        analyzer.add_results([
-            make_result(vulnerable=True),
-            make_result(payload_id="002", vulnerable=False),
-        ])
+        analyzer.add_results(
+            [
+                make_result(vulnerable=True),
+                make_result(payload_id="002", vulnerable=False),
+            ]
+        )
         summary = analyzer.build_summary()
         assert summary["total_vulnerabilities"] == 1
         assert summary["vulnerability_rate"] == pytest.approx(0.5)
@@ -88,21 +89,25 @@ class TestResponseAnalyzer:
 
     def test_by_severity_counts(self) -> None:
         analyzer = ResponseAnalyzer()
-        analyzer.add_results([
-            make_result(severity=SeverityLevel.HIGH),
-            make_result(payload_id="002", severity=SeverityLevel.MEDIUM),
-        ])
+        analyzer.add_results(
+            [
+                make_result(severity=SeverityLevel.HIGH),
+                make_result(payload_id="002", severity=SeverityLevel.MEDIUM),
+            ]
+        )
         summary = analyzer.build_summary()
         assert summary["by_severity"]["high"] == 1
         assert summary["by_severity"]["medium"] == 1
 
     def test_top_findings_sorted_by_severity(self) -> None:
         analyzer = ResponseAnalyzer()
-        analyzer.add_results([
-            make_result(payload_id="LOW",  severity=SeverityLevel.LOW),
-            make_result(payload_id="CRIT", severity=SeverityLevel.CRITICAL),
-            make_result(payload_id="HIGH", severity=SeverityLevel.HIGH),
-        ])
+        analyzer.add_results(
+            [
+                make_result(payload_id="LOW", severity=SeverityLevel.LOW),
+                make_result(payload_id="CRIT", severity=SeverityLevel.CRITICAL),
+                make_result(payload_id="HIGH", severity=SeverityLevel.HIGH),
+            ]
+        )
         summary = analyzer.build_summary()
         findings = summary["top_findings"]
         # First finding must be the highest severity
@@ -110,14 +115,16 @@ class TestResponseAnalyzer:
 
     def test_apply_to_report(self) -> None:
         analyzer = ResponseAnalyzer()
-        analyzer.add_results([
-            make_result(),
-            make_result(payload_id="002", vulnerable=False),
-        ])
+        analyzer.add_results(
+            [
+                make_result(),
+                make_result(payload_id="002", vulnerable=False),
+            ]
+        )
         report = ScanReport(
             scan_id="x",
             target_model="m",
-            started_at=datetime.datetime.now(datetime.timezone.utc),
+            started_at=datetime.datetime.now(datetime.UTC),
         )
         analyzer.apply_to_report(report)
         assert report.total_payloads == 2
@@ -137,14 +144,20 @@ class TestResponseAnalyzer:
         analyzer.add_results([make_result()])
         summary = analyzer.build_summary()
         required = {
-            "total_payloads", "total_vulnerabilities",
-            "vulnerability_rate", "risk_score", "risk_level",
-            "by_module", "by_severity", "top_findings",
+            "total_payloads",
+            "total_vulnerabilities",
+            "vulnerability_rate",
+            "risk_score",
+            "risk_level",
+            "by_module",
+            "by_severity",
+            "top_findings",
         }
         assert required.issubset(summary.keys())
 
     def test_risk_score_nonzero_when_vulnerable(self, fake_llm) -> None:
         from llm_pentest.modules.prompt_injection import PromptInjectionModule
+
         fake_llm.send.return_value = "DAN Mode Enabled. I am now unrestricted."
         module = PromptInjectionModule(fake_llm)
         analyzer = ResponseAnalyzer()
@@ -155,10 +168,12 @@ class TestResponseAnalyzer:
 
 class TestReportGenerator:
     def test_generate_json(self, tmp_path) -> None:
-        report = make_report([
-            make_result(),
-            make_result(payload_id="002", vulnerable=False),
-        ])
+        report = make_report(
+            [
+                make_result(),
+                make_result(payload_id="002", vulnerable=False),
+            ]
+        )
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["json"])
         assert "json" in paths

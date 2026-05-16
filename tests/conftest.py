@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -30,7 +29,6 @@ def fake_llm():
     return mock
 
 
-
 @pytest.fixture()
 def default_app_config() -> AppConfig:
     return AppConfig()
@@ -47,4 +45,3 @@ def tmp_db(tmp_path: Path) -> Database:
     db = Database(db_path=str(tmp_path / "test.db"))
     db.init()
     return db
-

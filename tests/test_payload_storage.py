@@ -1,12 +1,12 @@
 """Tests for PayloadStorage.
 
-    pytest tests/test_payload_storage.py -v
+pytest tests/test_payload_storage.py -v
 """
 
 from __future__ import annotations
 
-import yaml
 import pytest
+import yaml
 
 from llm_pentest.models import ModuleName, Payload
 from llm_pentest.payload_storage import PayloadStorage
@@ -23,9 +23,7 @@ class TestPayloadStorage:
         storage = PayloadStorage()
         for module in ModuleName:
             payloads = storage.get_payloads(module)
-            assert len(payloads) >= 1, (
-                f"Module '{module.value}' has no built-in payloads"
-            )
+            assert len(payloads) >= 1, f"Module '{module.value}' has no built-in payloads"
 
     def test_get_all_payloads(self) -> None:
         storage = PayloadStorage()
@@ -115,9 +113,7 @@ class TestPayloadStorage:
                 "prompt": "Override prompt",
             }
         ]
-        (tmp_path / "prompt_injection.yaml").write_text(
-            yaml.dump(custom), encoding="utf-8"
-        )
+        (tmp_path / "prompt_injection.yaml").write_text(yaml.dump(custom), encoding="utf-8")
         storage = PayloadStorage(custom_dir=str(tmp_path))
         payloads = storage.get_payloads(ModuleName.PROMPT_INJECTION)
         ids = [p.id for p in payloads]

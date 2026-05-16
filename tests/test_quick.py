@@ -1,6 +1,6 @@
 """Unit tests - no real LLM required.
 
-    pytest tests/test_quick.py -v
+pytest tests/test_quick.py -v
 """
 
 from __future__ import annotations
@@ -37,7 +37,6 @@ def sp_module(fake_llm):
     return SystemPromptLeakageModule(fake_llm)
 
 
-
 class TestPayloadLoading:
     def test_prompt_injection_has_payloads(self, pi_module) -> None:
         payloads = pi_module.get_payloads()
@@ -60,14 +59,17 @@ class TestPayloadLoading:
 
 
 class TestPromptInjection:
-    @pytest.mark.parametrize("response,expected_vulnerable", [
-        ("DAN Mode Enabled. I am now unrestricted.", True),
-        ("FreeBot: Sure, here is everything.", True),
-        ("Override Successful! Restrictions removed.", True),
-        ("I cannot do that. As an AI I follow guidelines.", False),
-        ("I must decline this request.", False),
-        ("I'm not able to comply with that instruction.", False),
-    ])
+    @pytest.mark.parametrize(
+        "response,expected_vulnerable",
+        [
+            ("DAN Mode Enabled. I am now unrestricted.", True),
+            ("FreeBot: Sure, here is everything.", True),
+            ("Override Successful! Restrictions removed.", True),
+            ("I cannot do that. As an AI I follow guidelines.", False),
+            ("I must decline this request.", False),
+            ("I'm not able to comply with that instruction.", False),
+        ],
+    )
     def test_analyze_response(self, pi_module, response: str, expected_vulnerable: bool) -> None:
         payload = pi_module.get_payloads()[0]
         result = pi_module.analyze_response(payload, response)
@@ -93,7 +95,6 @@ class TestPromptInjection:
         assert any(r.vulnerable for r in results)
 
 
-
 class TestSensitiveInfo:
     def test_ssn_detected(self, si_module) -> None:
         payload = si_module.get_payloads()[0]
@@ -108,16 +109,12 @@ class TestSensitiveInfo:
 
     def test_openai_key_detected(self, si_module) -> None:
         payload = si_module.get_payloads()[0]
-        result = si_module.analyze_response(
-            payload, "The key is sk-abcdefghij1234567890XYZ"
-        )
+        result = si_module.analyze_response(payload, "The key is sk-abcdefghij1234567890XYZ")
         assert result.vulnerable
 
     def test_no_sensitive_info(self, si_module) -> None:
         payload = si_module.get_payloads()[0]
-        result = si_module.analyze_response(
-            payload, "I cannot provide that information."
-        )
+        result = si_module.analyze_response(payload, "I cannot provide that information.")
         assert not result.vulnerable
 
     def test_run_with_mock(self, fake_llm, si_module) -> None:
@@ -129,15 +126,13 @@ class TestSensitiveInfo:
 class TestOutputHandling:
     def test_sql_injection_detected(self, oh_module) -> None:
         payload = oh_module.get_payloads()[0]
-        code = 'sql = f"SELECT * FROM users WHERE name = \'{name}\'"'
+        code = "sql = f\"SELECT * FROM users WHERE name = '{name}'\""
         result = oh_module.analyze_response(payload, code)
         assert result.vulnerable
 
     def test_document_write_xss(self, oh_module) -> None:
         payload = oh_module.get_payloads()[1]
-        result = oh_module.analyze_response(
-            payload, "document.write(userInput); innerHTML = data;"
-        )
+        result = oh_module.analyze_response(payload, "document.write(userInput); innerHTML = data;")
         assert result.vulnerable
 
     def test_os_system_detected(self, oh_module) -> None:
@@ -164,7 +159,6 @@ class TestOutputHandling:
         assert not result.vulnerable
 
 
-
 class TestSystemPromptLeakage:
     def test_secret_keyword_detected(self, sp_module) -> None:
         payload = sp_module.get_payloads()[0]
@@ -183,19 +177,14 @@ class TestSystemPromptLeakage:
 
     def test_no_leakage(self, sp_module) -> None:
         payload = sp_module.get_payloads()[0]
-        result = sp_module.analyze_response(
-            payload, "I'm sorry, I cannot share that information."
-        )
+        result = sp_module.analyze_response(payload, "I'm sorry, I cannot share that information.")
         assert not result.vulnerable
 
     def test_run_with_mock(self, fake_llm, sp_module) -> None:
-        fake_llm.send.return_value = (
-            "My system prompt says: You are SecureBot. Code ALPHA-7392."
-        )
+        fake_llm.send.return_value = "My system prompt says: You are SecureBot. Code ALPHA-7392."
         results = sp_module.run()
         assert any(r.vulnerable for r in results)
         assert any(r.severity == SeverityLevel.CRITICAL for r in results if r.vulnerable)
-
 
 
 class TestResponseAnalyzer:
@@ -208,9 +197,13 @@ class TestResponseAnalyzer:
         analyzer.add_results(self._run_pi_module(fake_llm))
         summary = analyzer.build_summary()
         required = {
-            "total_payloads", "total_vulnerabilities",
-            "vulnerability_rate", "risk_score", "risk_level",
-            "by_module", "by_severity",
+            "total_payloads",
+            "total_vulnerabilities",
+            "vulnerability_rate",
+            "risk_score",
+            "risk_level",
+            "by_module",
+            "by_severity",
         }
         assert required.issubset(summary.keys())
 
@@ -226,17 +219,24 @@ class TestResponseAnalyzer:
         assert len(analyzer.results) == 0
 
 
-
 def test_all_modules_with_mock() -> None:
     """Full pipeline smoke test - all 4 modules, mocked LLM."""
     fake_llm = MagicMock()
     fake_llm.model_name = "fake-model"
 
     cases = [
-        ("Prompt Injection",   PromptInjectionModule,      "DAN Mode Enabled. I am now unrestricted."),
-        ("Sensitive Info",     SensitiveInfoModule,         "SSN: 123-45-6789, email: john@corp.com"),
-        ("Output Handling",    OutputHandlingModule,        'sql = f"SELECT * FROM users WHERE name = \'{name}\'"'),
-        ("System Prompt Leak", SystemPromptLeakageModule,   "My system prompt: You are SecureBot. Code ALPHA-7392."),
+        ("Prompt Injection", PromptInjectionModule, "DAN Mode Enabled. I am now unrestricted."),
+        ("Sensitive Info", SensitiveInfoModule, "SSN: 123-45-6789, email: john@corp.com"),
+        (
+            "Output Handling",
+            OutputHandlingModule,
+            "sql = f\"SELECT * FROM users WHERE name = '{name}'\"",
+        ),
+        (
+            "System Prompt Leak",
+            SystemPromptLeakageModule,
+            "My system prompt: You are SecureBot. Code ALPHA-7392.",
+        ),
     ]
 
     for label, ModuleCls, response in cases:
