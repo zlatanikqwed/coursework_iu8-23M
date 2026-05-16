@@ -14,6 +14,7 @@ if _src not in _sys.path:
     _sys.path.insert(0, _src)
 del _sys, _os, _src
 import argparse  # noqa: E402
+import sys  # noqa: E402
 
 from llm_pentest.config import TargetConfig, load_config  # noqa: E402
 from llm_pentest.llm_target import LLMTarget  # noqa: E402
