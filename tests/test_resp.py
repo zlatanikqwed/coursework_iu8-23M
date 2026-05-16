@@ -1,29 +1,30 @@
-"""Interactive LLM Response Tester
-python tests/test_resp.py
-python tests/test_resp.py --config config.yaml
-python tests/test_resp.py --provider openai --model gpt-4o --api-key sk-...
+"""Full integration test against a real LLM.
+
+python tests/test_real_llm.py
+python tests/test_real_llm.py --model llama3.1:8b --provider ollama
+python tests/test_real_llm.py --modules prompt_injection system_prompt_leakage
+python tests/test_real_llm.py --concurrent --output-dir ./reports
 """
 
 from __future__ import annotations
 
-import os as _os
-import sys as _sys
+import argparse
+import datetime
+import os
+import sys
 
-_src = _os.path.normpath(_os.path.join(_os.path.dirname(__file__), "..", "src"))
-if _src not in _sys.path:
-    _sys.path.insert(0, _src)
-del _sys, _os, _src
-import argparse  # noqa: E402
-import sys  # noqa: E402
+# Allow running without installing the package
+_SRC = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
 from llm_pentest.config import TargetConfig, load_config  # noqa: E402
 from llm_pentest.llm_target import LLMTarget  # noqa: E402
-from llm_pentest.models import ModuleName, Payload  # noqa: E402
-from llm_pentest.modules.output_handling import OutputHandlingModule  # noqa: E402
-from llm_pentest.modules.prompt_injection import PromptInjectionModule  # noqa: E402
-from llm_pentest.modules.sensitive_info import SensitiveInfoModule  # noqa: E402
-from llm_pentest.modules.system_prompt import SystemPromptLeakageModule  # noqa: E402
+from llm_pentest.models import ModuleName, SeverityLevel  # noqa: E402
+from llm_pentest.orchestrator import ScanOrchestrator  # noqa: E402
+from llm_pentest.report import ReportGenerator  # noqa: E402
 
+# ANSI colour helpers
 RESET = "\033[0m"
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -33,37 +34,59 @@ BOLD = "\033[1m"
 DIM = "\033[2m"
 
 
-def red(s: str) -> str:
-    return f"{RED}{s}{RESET}"
+def col(text: str, code: str) -> str:
+    return f"{code}{text}{RESET}"
 
 
-def green(s: str) -> str:
-    return f"{GREEN}{s}{RESET}"
+def sep(char: str = "-", n: int = 65) -> None:
+    print(char * n)
 
 
-def cyan(s: str) -> str:
-    return f"{CYAN}{s}{RESET}"
+def _status(vulnerable: bool) -> str:
+    return col("VULNERABLE", RED) if vulnerable else col("SAFE      ", GREEN)
 
 
-def bold(s: str) -> str:
-    return f"{BOLD}{s}{RESET}"
-
-
-def dim(s: str) -> str:
-    return f"{DIM}{s}{RESET}"
-
-
-def sep(char: str = "-", width: int = 60) -> None:
-    print(char * width)
+def _severity(sev: SeverityLevel) -> str:
+    colour = {
+        SeverityLevel.CRITICAL: RED,
+        SeverityLevel.HIGH: RED,
+        SeverityLevel.MEDIUM: YELLOW,
+        SeverityLevel.LOW: GREEN,
+        SeverityLevel.INFO: DIM,
+    }.get(sev, "")
+    return col(sev.value.upper(), colour)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="LLM Pentest - Интерактивный тестер ответов")
-    parser.add_argument("--config", "-c", default=None, help="Путь к config.yaml")
-    parser.add_argument("--provider", default="ollama", help="Провайдер LLM")
-    parser.add_argument("--model", default="llama3.1:8b", help="Название модели")
-    parser.add_argument("--base-url", default="http://localhost:11434", help="Базовый URL API")
-    parser.add_argument("--api-key", default="", help="API-ключ (если требуется)")
+    parser = argparse.ArgumentParser(description="LLM Pentest - Full integration test")
+    parser.add_argument("--config", "-c", default=None, help="Path to config.yaml")
+    parser.add_argument("--provider", default="ollama", help="LLM provider")
+    parser.add_argument("--model", default="llama3.1:8b", help="Model name")
+    parser.add_argument("--base-url", default="http://localhost:11434", help="API base URL")
+    parser.add_argument("--api-key", default="", help="API key (if required)")
+    parser.add_argument(
+        "--modules",
+        "-m",
+        nargs="+",
+        choices=[m.value for m in ModuleName],
+        default=None,
+        help="Modules to run (default: all)",
+    )
+    parser.add_argument(
+        "--concurrent",
+        action="store_true",
+        help="Run modules concurrently",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="./reports",
+        help="Directory for saved reports",
+    )
+    parser.add_argument(
+        "--system-prompt",
+        default=None,
+        help="Override system prompt for the scan",
+    )
     return parser.parse_args()
 
 
@@ -78,145 +101,141 @@ def main() -> None:
         api_key=args.api_key,
         temperature=app_config.target.temperature,
         max_tokens=app_config.target.max_tokens,
-        system_prompt=app_config.target.system_prompt,
+        system_prompt=args.system_prompt or app_config.target.system_prompt,
     )
 
-    llm = LLMTarget(target_cfg)
-
-    modules = {
-        "1": (
-            "Prompt Injection   (LLM01)",
-            PromptInjectionModule(llm),
-            ModuleName.PROMPT_INJECTION,
-        ),
-        "2": ("Sensitive Info     (LLM02)", SensitiveInfoModule(llm), ModuleName.SENSITIVE_INFO),
-        "3": ("Output Handling    (LLM05)", OutputHandlingModule(llm), ModuleName.OUTPUT_HANDLING),
-        "4": (
-            "System Prompt Leak (LLM07)",
-            SystemPromptLeakageModule(llm),
-            ModuleName.SYSTEM_PROMPT_LEAKAGE,
-        ),
-    }
-
     print()
-    print(bold("LLM Pentest -- Интерактивный тестер ответов"))
+    print(col("LLM Pentest - Full Integration Test", BOLD))
     sep("=")
-    print(f"  Провайдер : {args.provider}")
-    print(f"  Модель    : {args.model}")
-    print(f"  Base URL  : {args.base_url}")
+    print(f"  Provider     : {args.provider}")
+    print(f"  Model        : {args.model}")
+    print(f"  Base URL     : {args.base_url}")
+    print(f"  Modules      : {args.modules or 'all'}")
+    print(f"  Concurrent   : {args.concurrent}")
+    print(f"  System prompt: {target_cfg.system_prompt[:60]}...")
     sep("=")
 
-    print("\nПроверка доступности LLM...")
-    if not llm.health_check():
-        print(red("ОШИБКА: LLM недоступна. Убедитесь, что Ollama запущена."))
+    # Health check
+    orchestrator = ScanOrchestrator(app_config, target_override=target_cfg)
+    print("\nChecking LLM availability...")
+    if not orchestrator.health_check():
+        print(col("ERROR: LLM is not available.", RED))
+        print(f"  Expected URL : {args.base_url}")
+        print(f"  Try          : ollama serve && ollama pull {args.model}")
         sys.exit(1)
-    print(green("LLM доступна.\n"))
+    print(col("LLM is online.", GREEN))
 
-    print("Доступные команды:")
-    print(f"  {cyan('exit')}         -- выход")
-    print(f"  {cyan('modules')}      -- список модулей анализа")
-    print(f"  {cyan('set prompt')}   -- изменить системный промпт")
-    print(f"  {cyan('show prompt')}  -- показать текущий системный промпт")
-    print()
+    # Smoke test - verify basic connectivity
+    llm = LLMTarget(target_cfg)
+    smoke = llm.send(
+        "Say exactly 'hello' and nothing else.",
+        system_prompt="Respond with one word.",
+    )
+    print(f"  Smoke test response: {col(smoke[:80], DIM)}\n")
 
-    system_prompt: str = target_cfg.system_prompt
+    # Run scan
+    selected_modules = [ModuleName(m) for m in args.modules] if args.modules else None
 
-    while True:
-        try:
-            user_input = input(f"\n{bold('Ваш запрос')}: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print("\n\nВыход.")
-            break
+    print(col("Starting scan...", BOLD))
+    started = datetime.datetime.now(datetime.UTC)
 
-        if not user_input:
-            continue
+    report = orchestrator.run(
+        modules=selected_modules,
+        system_prompt=args.system_prompt,
+        concurrent=args.concurrent,
+    )
 
-        cmd = user_input.lower()
+    elapsed = (datetime.datetime.now(datetime.UTC) - started).total_seconds()
 
-        if cmd == "exit":
-            print("Выход.")
-            break
+    # Per-result output
+    current_module: str | None = None
+    for result in report.results:
+        mod_label = result.module.value
+        if mod_label != current_module:
+            current_module = mod_label
+            print()
+            sep()
+            print(col(f"  MODULE: {mod_label.upper()}", CYAN + BOLD))
+            sep()
 
-        if cmd == "modules":
-            print(f"\n{bold('Доступные модули анализа:')}")
-            for key, (name, _, _) in modules.items():
-                print(f"  {cyan(key)}. {name}")
-            continue
-
-        if cmd == "show prompt":
-            print(f"\n  Системный промпт: {dim(system_prompt)}")
-            continue
-
-        if cmd == "set prompt":
-            try:
-                new_prompt = input("  Новый системный промпт: ").strip()
-            except (KeyboardInterrupt, EOFError):
-                continue
-            if new_prompt:
-                system_prompt = new_prompt
-                print(green("  Системный промпт обновлен."))
-            continue
-
-        print(f"\n{bold('Анализировать ответ через:')}")
-        print(f"  {cyan('0')}. Все модули")
-        for key, (name, _, _) in modules.items():
-            print(f"  {cyan(key)}. {name}")
-
-        try:
-            choice = input(f"\n  Выбор (0/1/2/3/4) [{cyan('0')}]: ").strip() or "0"
-        except (KeyboardInterrupt, EOFError):
-            continue
-
-        print(f"\n{dim('Отправка запроса в LLM...')}")
-        try:
-            response = llm.send(user_prompt=user_input, system_prompt=system_prompt)
-        except Exception as exc:
-            print(red(f"Ошибка LLM: {exc}"))
-            continue
-
-        print(f"\n{bold('Ответ LLM:')}")
-        sep()
-        print(response)
-        sep()
-
-        print(f"\n{bold('АНАЛИЗ УЯЗВИМОСТЕЙ')}")
-        sep()
-
-        selected_keys = (
-            list(modules.keys())
-            if choice == "0"
-            else ([choice] if choice in modules else list(modules.keys()))
+        print(
+            f"  [{result.payload_id}]  {result.payload_name:<42} "
+            f"{_status(result.vulnerable)}  {_severity(result.severity)}"
         )
 
-        found_any = False
-        for key in selected_keys:
-            name, module, mod_enum = modules[key]
-            payload = Payload(
-                id="INTERACTIVE",
-                module=mod_enum,
-                name="Пользовательский ввод",
-                prompt=user_input,
-            )
-            result = module.analyze_response(payload, response)
+        if result.evidence:
+            for ev in result.evidence[:3]:
+                print(f"             {col('Evidence:', DIM)} {ev}")
 
-            if result.vulnerable:
-                found_any = True
-                sev = result.severity.value.upper()
-                sev_colour = RED if sev in ("CRITICAL", "HIGH") else YELLOW
-                print(f"\n  {red('УЯЗВИМОСТЬ')} [{name}]")
-                print(f"  Уровень серьезности : {sev_colour}{sev}{RESET}")
-                for ev in result.evidence:
-                    print(f"  Доказательство      : {dim(ev)}")
-            else:
-                print(f"\n  {green('БЕЗОПАСНО')}   [{name}]")
+        preview = result.response_text[:120].replace("\n", " ")
+        print(f"             {col('LLM:', DIM)} {preview}...")
 
+    # Summary
+    print()
+    sep("=")
+    print(col("  SCAN SUMMARY", BOLD))
+    sep("=")
+
+    summary = report.summary
+    risk = summary.get("risk_level", "?")
+    risk_colour = RED if risk in ("CRITICAL", "HIGH") else (YELLOW if risk == "MEDIUM" else GREEN)
+
+    print(f"  Scan ID      : {report.scan_id}")
+    print(f"  Status       : {report.status.value}")
+    print(f"  Duration     : {elapsed:.1f}s")
+    print(f"  Payloads     : {summary.get('total_payloads', 0)}")
+    print(f"  Vulns found  : {col(str(summary.get('total_vulnerabilities', 0)), RED)}")
+    print(f"  Risk level   : {col(risk, risk_colour + BOLD)}")
+    print(f"  Risk score   : {summary.get('risk_score', 0)} / 100")
+
+    print()
+    print("  By severity:")
+    labels = {
+        "critical": "Critical",
+        "high": "High  ",
+        "medium": "Medium ",
+        "low": "Low   ",
+        "info": "Info  ",
+    }
+    for sev, count in summary.get("by_severity", {}).items():
+        if count:
+            print(f"    {labels.get(sev, sev)}: {count}")
+
+    print()
+    print("  By module:")
+    for mod, info in summary.get("by_module", {}).items():
+        vulns = info.get("vulnerabilities", 0)
+        total = info.get("total_payloads", 0)
+        bar = "#" * vulns + "." * (total - vulns)
+        print(f"    {mod:<30}: {vulns}/{total}  [{bar}]")
+
+    top = summary.get("top_findings", [])
+    if top:
         print()
-        sep()
-        if found_any:
-            print(red("  ВНИМАНИЕ: В ответе LLM обнаружены уязвимости"))
-        else:
-            print(green("  Ответ не содержит признаков уязвимостей."))
-        sep()
+        print("  Top findings:")
+        for finding in top:
+            sev = finding["severity"].upper()
+            sev_col = RED if sev in ("CRITICAL", "HIGH") else YELLOW
+            print(f"    [{finding['payload_id']}] {finding['name']:<38} {col(sev, sev_col)}")
+
+    sep("=")
+
+    #  Save reports
+    print()
+    gen = ReportGenerator(output_dir=args.output_dir)
+    paths = gen.generate(report, formats=app_config.report.formats)
+    print("  Reports saved:")
+    for fmt, path in paths.items():
+        print(f"    {fmt.upper():<6}: {path}")
+
+    print()
+    exit_code = 0 if summary.get("total_vulnerabilities", 0) == 0 else 1
+    if exit_code == 0:
+        print(col("Scan complete. No vulnerabilities found.", GREEN))
+    else:
+        print(col("Scan complete. Vulnerabilities detected.", RED))
+    print()
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

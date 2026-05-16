@@ -12,8 +12,8 @@ _SRC = str(Path(__file__).parent.parent / "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from llm_pentest.config import AppConfig, TargetConfig
-from llm_pentest.database import Database
+from llm_pentest.config import AppConfig, TargetConfig  # noqa: E402
+from llm_pentest.database import Database  # noqa: E402
 
 
 @pytest.fixture()
