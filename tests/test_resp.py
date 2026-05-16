@@ -1,60 +1,70 @@
 """Interactive LLM Response Tester
-    python tests/test_resp.py
-    python tests/test_resp.py --config config.yaml
-    python tests/test_resp.py --provider openai --model gpt-4o --api-key sk-...
+python tests/test_resp.py
+python tests/test_resp.py --config config.yaml
+python tests/test_resp.py --provider openai --model gpt-4o --api-key sk-...
 """
 
 from __future__ import annotations
-import sys as _sys, os as _os
+
+import os as _os
+import sys as _sys
+
 _src = _os.path.normpath(_os.path.join(_os.path.dirname(__file__), "..", "src"))
 if _src not in _sys.path:
     _sys.path.insert(0, _src)
 del _sys, _os, _src
 import argparse  # noqa: E402
+
 from llm_pentest.config import TargetConfig, load_config  # noqa: E402
 from llm_pentest.llm_target import LLMTarget  # noqa: E402
 from llm_pentest.models import ModuleName, Payload  # noqa: E402
+from llm_pentest.modules.output_handling import OutputHandlingModule  # noqa: E402
 from llm_pentest.modules.prompt_injection import PromptInjectionModule  # noqa: E402
 from llm_pentest.modules.sensitive_info import SensitiveInfoModule  # noqa: E402
-from llm_pentest.modules.output_handling import OutputHandlingModule  # noqa: E402
 from llm_pentest.modules.system_prompt import SystemPromptLeakageModule  # noqa: E402
 
-RESET  = "\033[0m"
-RED    = "\033[91m"
-GREEN  = "\033[92m"
+RESET = "\033[0m"
+RED = "\033[91m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-CYAN   = "\033[96m"
-BOLD   = "\033[1m"
-DIM    = "\033[2m"
+CYAN = "\033[96m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+
 
 def red(s: str) -> str:
     return f"{RED}{s}{RESET}"
 
+
 def green(s: str) -> str:
     return f"{GREEN}{s}{RESET}"
+
 
 def cyan(s: str) -> str:
     return f"{CYAN}{s}{RESET}"
 
+
 def bold(s: str) -> str:
     return f"{BOLD}{s}{RESET}"
+
 
 def dim(s: str) -> str:
     return f"{DIM}{s}{RESET}"
 
+
 def sep(char: str = "-", width: int = 60) -> None:
     print(char * width)
 
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="LLM Pentest - Интерактивный тестер ответов"
-    )
+    parser = argparse.ArgumentParser(description="LLM Pentest - Интерактивный тестер ответов")
     parser.add_argument("--config", "-c", default=None, help="Путь к config.yaml")
     parser.add_argument("--provider", default="ollama", help="Провайдер LLM")
     parser.add_argument("--model", default="llama3.1:8b", help="Название модели")
     parser.add_argument("--base-url", default="http://localhost:11434", help="Базовый URL API")
     parser.add_argument("--api-key", default="", help="API-ключ (если требуется)")
     return parser.parse_args()
+
 
 def main() -> None:
     args = parse_args()
@@ -73,10 +83,18 @@ def main() -> None:
     llm = LLMTarget(target_cfg)
 
     modules = {
-        "1": ("Prompt Injection   (LLM01)", PromptInjectionModule(llm),       ModuleName.PROMPT_INJECTION),
-        "2": ("Sensitive Info     (LLM02)", SensitiveInfoModule(llm),          ModuleName.SENSITIVE_INFO),
-        "3": ("Output Handling    (LLM05)", OutputHandlingModule(llm),         ModuleName.OUTPUT_HANDLING),
-        "4": ("System Prompt Leak (LLM07)", SystemPromptLeakageModule(llm),    ModuleName.SYSTEM_PROMPT_LEAKAGE),
+        "1": (
+            "Prompt Injection   (LLM01)",
+            PromptInjectionModule(llm),
+            ModuleName.PROMPT_INJECTION,
+        ),
+        "2": ("Sensitive Info     (LLM02)", SensitiveInfoModule(llm), ModuleName.SENSITIVE_INFO),
+        "3": ("Output Handling    (LLM05)", OutputHandlingModule(llm), ModuleName.OUTPUT_HANDLING),
+        "4": (
+            "System Prompt Leak (LLM07)",
+            SystemPromptLeakageModule(llm),
+            ModuleName.SYSTEM_PROMPT_LEAKAGE,
+        ),
     }
 
     print()
@@ -164,7 +182,8 @@ def main() -> None:
         sep()
 
         selected_keys = (
-            list(modules.keys()) if choice == "0"
+            list(modules.keys())
+            if choice == "0"
             else ([choice] if choice in modules else list(modules.keys()))
         )
 
@@ -197,6 +216,7 @@ def main() -> None:
         else:
             print(green("  Ответ не содержит признаков уязвимостей."))
         sep()
+
 
 if __name__ == "__main__":
     main()
