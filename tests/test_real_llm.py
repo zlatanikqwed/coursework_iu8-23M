@@ -18,11 +18,11 @@ _SRC = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "src"))
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from llm_pentest.config import TargetConfig, load_config
-from llm_pentest.llm_target import LLMTarget
-from llm_pentest.models import ModuleName, SeverityLevel
-from llm_pentest.orchestrator import ScanOrchestrator
-from llm_pentest.report import ReportGenerator
+from llm_pentest.config import TargetConfig, load_config  # noqa: E402
+from llm_pentest.llm_target import LLMTarget  # noqa: E402
+from llm_pentest.models import ModuleName, SeverityLevel  # noqa: E402
+from llm_pentest.orchestrator import ScanOrchestrator  # noqa: E402
+from llm_pentest.report import ReportGenerator  # noqa: E402
 
 # ANSI colour helpers
 RESET = "\033[0m"
