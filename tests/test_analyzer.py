@@ -1,20 +1,25 @@
-"""Tests for ResponseAnalyzer and ReportGenerator
+"""Tests for ResponseAnalyzer and ReportGenerator.
+
     pytest tests/test_analyzer.py -v
 """
 
 from __future__ import annotations
+
 import datetime
 import json
+
 import pytest
+
 from llm_pentest.analyzer import ResponseAnalyzer
 from llm_pentest.models import (
     AttackResult,
     ModuleName,
-    SeverityLevel,
     ScanReport,
     ScanStatus,
+    SeverityLevel,
 )
 from llm_pentest.report import ReportGenerator
+
 
 def make_result(
     payload_id: str = "TEST-001",
@@ -26,12 +31,12 @@ def make_result(
     return AttackResult(
         payload_id=payload_id,
         module=module,
-        payload_name="Тестовый payload",
-        prompt_sent="тестовый промпт",
-        response_text="тестовый ответ",
+        payload_name="Test payload",
+        prompt_sent="test prompt",
+        response_text="test response",
         vulnerable=vulnerable,
         severity=severity,
-        evidence=evidence or ["совпадение: тестовый паттерн"],
+        evidence=evidence or ["pattern matched: test signature"],
     )
 
 
@@ -49,8 +54,9 @@ def make_report(results: list[AttackResult]) -> ScanReport:
     return report
 
 
+
 class TestResponseAnalyzer:
-    def test_empty(self):
+    def test_empty(self) -> None:
         analyzer = ResponseAnalyzer()
         summary = analyzer.build_summary()
         assert summary["total_payloads"] == 0
@@ -58,12 +64,12 @@ class TestResponseAnalyzer:
         assert summary["risk_score"] == 0.0
         assert summary["risk_level"] == "SAFE"
 
-    def test_add_res(self):
+    def test_add_results(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result(), make_result(payload_id="TEST-002")])
         assert len(analyzer.results) == 2
 
-    def test_count_vuln(self):
+    def test_count_vulnerabilities(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(vulnerable=True),
@@ -71,15 +77,16 @@ class TestResponseAnalyzer:
         ])
         summary = analyzer.build_summary()
         assert summary["total_vulnerabilities"] == 1
+        assert summary["vulnerability_rate"] == pytest.approx(0.5)
 
-    def test_risk(self):
+    def test_risk_score_increases_with_critical(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result(severity=SeverityLevel.CRITICAL)] * 3)
         summary = analyzer.build_summary()
         assert summary["risk_score"] > 0
         assert summary["risk_level"] in ("CRITICAL", "HIGH")
 
-    def test_for_level(self):
+    def test_by_severity_counts(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(severity=SeverityLevel.HIGH),
@@ -89,7 +96,7 @@ class TestResponseAnalyzer:
         assert summary["by_severity"]["high"] == 1
         assert summary["by_severity"]["medium"] == 1
 
-    def test_top_sort(self):
+    def test_top_findings_sorted_by_severity(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(payload_id="LOW",  severity=SeverityLevel.LOW),
@@ -98,9 +105,10 @@ class TestResponseAnalyzer:
         ])
         summary = analyzer.build_summary()
         findings = summary["top_findings"]
+        # First finding must be the highest severity
         assert findings[0]["severity"] == "critical"
 
-    def test_apply_to_report(self):
+    def test_apply_to_report(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([
             make_result(),
@@ -116,7 +124,7 @@ class TestResponseAnalyzer:
         assert report.total_vulnerabilities == 1
         assert "risk_level" in report.summary
 
-    def test_clean_res(self):
+    def test_clear_resets_state(self) -> None:
         analyzer = ResponseAnalyzer()
         analyzer.add_results([make_result()])
         analyzer.clear()
@@ -124,8 +132,29 @@ class TestResponseAnalyzer:
         summary = analyzer.build_summary()
         assert summary["total_payloads"] == 0
 
+    def test_summary_required_keys(self) -> None:
+        analyzer = ResponseAnalyzer()
+        analyzer.add_results([make_result()])
+        summary = analyzer.build_summary()
+        required = {
+            "total_payloads", "total_vulnerabilities",
+            "vulnerability_rate", "risk_score", "risk_level",
+            "by_module", "by_severity", "top_findings",
+        }
+        assert required.issubset(summary.keys())
+
+    def test_risk_score_nonzero_when_vulnerable(self, fake_llm) -> None:
+        from llm_pentest.modules.prompt_injection import PromptInjectionModule
+        fake_llm.send.return_value = "DAN Mode Enabled. I am now unrestricted."
+        module = PromptInjectionModule(fake_llm)
+        analyzer = ResponseAnalyzer()
+        analyzer.add_results(module.run())
+        summary = analyzer.build_summary()
+        assert summary["risk_score"] > 0
+
+
 class TestReportGenerator:
-    def test_generation_json(self, tmp_path):
+    def test_generate_json(self, tmp_path) -> None:
         report = make_report([
             make_result(),
             make_result(payload_id="002", vulnerable=False),
@@ -134,12 +163,11 @@ class TestReportGenerator:
         paths = gen.generate(report, formats=["json"])
         assert "json" in paths
         assert paths["json"].exists()
-        with open(paths["json"]) as f:
-            data = json.load(f)
+        data = json.loads(paths["json"].read_text())
         assert data["scan_id"] == "test-scan-1234"
         assert data["total_vulnerabilities"] == 1
 
-    def test_generation_html(self, tmp_path):
+    def test_generate_html(self, tmp_path) -> None:
         report = make_report([make_result(severity=SeverityLevel.CRITICAL)])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["html"])
@@ -149,7 +177,7 @@ class TestReportGenerator:
         assert "LLM Pentest Report" in content
         assert "VULNERABLE" in content
 
-    def test_all(self, tmp_path):
+    def test_generate_both_formats(self, tmp_path) -> None:
         report = make_report([make_result()])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["json", "html"])
@@ -157,14 +185,14 @@ class TestReportGenerator:
         assert paths["json"].exists()
         assert paths["html"].exists()
 
-    def test_creat_directory(self, tmp_path):
+    def test_creates_output_directory(self, tmp_path) -> None:
         target = tmp_path / "nested" / "reports"
         report = make_report([])
         gen = ReportGenerator(output_dir=str(target))
         gen.generate(report, formats=["json"])
         assert target.exists()
 
-    def test_unknown_format(self, tmp_path):
+    def test_unknown_format_ignored(self, tmp_path) -> None:
         report = make_report([])
         gen = ReportGenerator(output_dir=str(tmp_path))
         paths = gen.generate(report, formats=["xml"])

@@ -1,0 +1,75 @@
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: llm-pentest-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - pentest-net
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 20s
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: llm-pentest-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - pentest-net
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c", "ollama pull llama3.1:8b"]
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: llm-pentest:latest
+    container_name: llm-pentest-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./reports:/app/reports
+      - ./payloads:/app/payloads
+      - pentest-data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      LLM_PROVIDER: ollama
+      LLM_MODEL: llama3.1:8b
+      LLM_BASE_URL: http://ollama:11434
+      LITELLM_LOCAL_MODEL_COST_MAP: "True"
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pentest-net
+    healthcheck:
+      test: ["CMD-SHELL",
+             "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  pentest-net:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local
+  pentest-data:
+    driver: local
