@@ -1,72 +1,60 @@
-"""Interactive LLM Response Tester.
-
-python tests/test_resp.py
-python tests/test_resp.py --config config.yaml
-python tests/test_resp.py --provider openai --model gpt-4o --api-key sk-...
+"""Interactive LLM Response Tester
+    python tests/test_resp.py
+    python tests/test_resp.py --config config.yaml
+    python tests/test_resp.py --provider openai --model gpt-4o --api-key sk-...
 """
 
 from __future__ import annotations
+import sys as _sys, os as _os
+_src = _os.path.normpath(_os.path.join(_os.path.dirname(__file__), "..", "src"))
+if _src not in _sys.path:
+    _sys.path.insert(0, _src)
+del _sys, _os, _src
+import argparse  # noqa: E402
+from llm_pentest.config import TargetConfig, load_config  # noqa: E402
+from llm_pentest.llm_target import LLMTarget  # noqa: E402
+from llm_pentest.models import ModuleName, Payload  # noqa: E402
+from llm_pentest.modules.prompt_injection import PromptInjectionModule  # noqa: E402
+from llm_pentest.modules.sensitive_info import SensitiveInfoModule  # noqa: E402
+from llm_pentest.modules.output_handling import OutputHandlingModule  # noqa: E402
+from llm_pentest.modules.system_prompt import SystemPromptLeakageModule  # noqa: E402
 
-import argparse
-import os
-import sys
-
-# Allow running without installing the package
-_SRC = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "src"))
-if _SRC not in sys.path:
-    sys.path.insert(0, _SRC)
-
-from llm_pentest.config import TargetConfig, load_config
-from llm_pentest.llm_target import LLMTarget
-from llm_pentest.models import ModuleName, Payload
-from llm_pentest.modules.output_handling import OutputHandlingModule
-from llm_pentest.modules.prompt_injection import PromptInjectionModule
-from llm_pentest.modules.sensitive_info import SensitiveInfoModule
-from llm_pentest.modules.system_prompt import SystemPromptLeakageModule
-
-# ANSI colour helpers
-RESET = "\033[0m"
-RED = "\033[91m"
-GREEN = "\033[92m"
+RESET  = "\033[0m"
+RED    = "\033[91m"
+GREEN  = "\033[92m"
 YELLOW = "\033[93m"
-CYAN = "\033[96m"
-BOLD = "\033[1m"
-DIM = "\033[2m"
-
+CYAN   = "\033[96m"
+BOLD   = "\033[1m"
+DIM    = "\033[2m"
 
 def red(s: str) -> str:
     return f"{RED}{s}{RESET}"
 
-
 def green(s: str) -> str:
     return f"{GREEN}{s}{RESET}"
-
 
 def cyan(s: str) -> str:
     return f"{CYAN}{s}{RESET}"
 
-
 def bold(s: str) -> str:
     return f"{BOLD}{s}{RESET}"
-
 
 def dim(s: str) -> str:
     return f"{DIM}{s}{RESET}"
 
-
 def sep(char: str = "-", width: int = 60) -> None:
     print(char * width)
 
-
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="LLM Pentest - Interactive response tester")
-    parser.add_argument("--config", "-c", default=None, help="Path to config.yaml")
-    parser.add_argument("--provider", default="ollama", help="LLM provider")
-    parser.add_argument("--model", default="llama3.1:8b", help="Model name")
-    parser.add_argument("--base-url", default="http://localhost:11434", help="API base URL")
-    parser.add_argument("--api-key", default="", help="API key (if required)")
+    parser = argparse.ArgumentParser(
+        description="LLM Pentest - Интерактивный тестер ответов"
+    )
+    parser.add_argument("--config", "-c", default=None, help="Путь к config.yaml")
+    parser.add_argument("--provider", default="ollama", help="Провайдер LLM")
+    parser.add_argument("--model", default="llama3.1:8b", help="Название модели")
+    parser.add_argument("--base-url", default="http://localhost:11434", help="Базовый URL API")
+    parser.add_argument("--api-key", default="", help="API-ключ (если требуется)")
     return parser.parse_args()
-
 
 def main() -> None:
     args = parse_args()
@@ -85,48 +73,40 @@ def main() -> None:
     llm = LLMTarget(target_cfg)
 
     modules = {
-        "1": (
-            "Prompt Injection   (LLM01)",
-            PromptInjectionModule(llm),
-            ModuleName.PROMPT_INJECTION,
-        ),
-        "2": ("Sensitive Info     (LLM02)", SensitiveInfoModule(llm), ModuleName.SENSITIVE_INFO),
-        "3": ("Output Handling    (LLM05)", OutputHandlingModule(llm), ModuleName.OUTPUT_HANDLING),
-        "4": (
-            "System Prompt Leak (LLM07)",
-            SystemPromptLeakageModule(llm),
-            ModuleName.SYSTEM_PROMPT_LEAKAGE,
-        ),
+        "1": ("Prompt Injection   (LLM01)", PromptInjectionModule(llm),       ModuleName.PROMPT_INJECTION),
+        "2": ("Sensitive Info     (LLM02)", SensitiveInfoModule(llm),          ModuleName.SENSITIVE_INFO),
+        "3": ("Output Handling    (LLM05)", OutputHandlingModule(llm),         ModuleName.OUTPUT_HANDLING),
+        "4": ("System Prompt Leak (LLM07)", SystemPromptLeakageModule(llm),    ModuleName.SYSTEM_PROMPT_LEAKAGE),
     }
 
     print()
-    print(bold("LLM Pentest - Interactive Response Tester"))
+    print(bold("LLM Pentest -- Интерактивный тестер ответов"))
     sep("=")
-    print(f"  Provider : {args.provider}")
-    print(f"  Model    : {args.model}")
-    print(f"  Base URL : {args.base_url}")
+    print(f"  Провайдер : {args.provider}")
+    print(f"  Модель    : {args.model}")
+    print(f"  Base URL  : {args.base_url}")
     sep("=")
 
-    print("\nChecking LLM availability...")
+    print("\nПроверка доступности LLM...")
     if not llm.health_check():
-        print(red("ERROR: LLM is not available. Make sure Ollama is running."))
+        print(red("ОШИБКА: LLM недоступна. Убедитесь, что Ollama запущена."))
         sys.exit(1)
-    print(green("LLM is online.\n"))
+    print(green("LLM доступна.\n"))
 
-    print("Available commands:")
-    print(f"  {cyan('exit')}         - quit")
-    print(f"  {cyan('modules')}      - list analysis modules")
-    print(f"  {cyan('set prompt')}   - change system prompt")
-    print(f"  {cyan('show prompt')}  - show current system prompt")
+    print("Доступные команды:")
+    print(f"  {cyan('exit')}         -- выход")
+    print(f"  {cyan('modules')}      -- список модулей анализа")
+    print(f"  {cyan('set prompt')}   -- изменить системный промпт")
+    print(f"  {cyan('show prompt')}  -- показать текущий системный промпт")
     print()
 
     system_prompt: str = target_cfg.system_prompt
 
     while True:
         try:
-            user_input = input(f"\n{bold('Your prompt')}: ").strip()
+            user_input = input(f"\n{bold('Ваш запрос')}: ").strip()
         except (KeyboardInterrupt, EOFError):
-            print("\n\nExiting.")
+            print("\n\nВыход.")
             break
 
         if not user_input:
@@ -135,57 +115,56 @@ def main() -> None:
         cmd = user_input.lower()
 
         if cmd == "exit":
-            print("Exiting.")
+            print("Выход.")
             break
 
         if cmd == "modules":
-            print(f"\n{bold('Available analysis modules:')}")
+            print(f"\n{bold('Доступные модули анализа:')}")
             for key, (name, _, _) in modules.items():
                 print(f"  {cyan(key)}. {name}")
             continue
 
         if cmd == "show prompt":
-            print(f"\n  System prompt: {dim(system_prompt)}")
+            print(f"\n  Системный промпт: {dim(system_prompt)}")
             continue
 
         if cmd == "set prompt":
             try:
-                new_prompt = input("  New system prompt: ").strip()
+                new_prompt = input("  Новый системный промпт: ").strip()
             except (KeyboardInterrupt, EOFError):
                 continue
             if new_prompt:
                 system_prompt = new_prompt
-                print(green("  System prompt updated."))
+                print(green("  Системный промпт обновлен."))
             continue
 
-        print(f"\n{bold('Analyse response with:')}")
-        print(f"  {cyan('0')}. All modules")
+        print(f"\n{bold('Анализировать ответ через:')}")
+        print(f"  {cyan('0')}. Все модули")
         for key, (name, _, _) in modules.items():
             print(f"  {cyan(key)}. {name}")
 
         try:
-            choice = input(f"\n  Choice (0/1/2/3/4) [{cyan('0')}]: ").strip() or "0"
+            choice = input(f"\n  Выбор (0/1/2/3/4) [{cyan('0')}]: ").strip() or "0"
         except (KeyboardInterrupt, EOFError):
             continue
 
-        print(f"\n{dim('Sending request to LLM...')}")
+        print(f"\n{dim('Отправка запроса в LLM...')}")
         try:
             response = llm.send(user_prompt=user_input, system_prompt=system_prompt)
         except Exception as exc:
-            print(red(f"LLM error: {exc}"))
+            print(red(f"Ошибка LLM: {exc}"))
             continue
 
-        print(f"\n{bold('LLM Response:')}")
+        print(f"\n{bold('Ответ LLM:')}")
         sep()
         print(response)
         sep()
 
-        print(f"\n{bold('VULNERABILITY ANALYSIS')}")
+        print(f"\n{bold('АНАЛИЗ УЯЗВИМОСТЕЙ')}")
         sep()
 
         selected_keys = (
-            list(modules.keys())
-            if choice == "0"
+            list(modules.keys()) if choice == "0"
             else ([choice] if choice in modules else list(modules.keys()))
         )
 
@@ -195,7 +174,7 @@ def main() -> None:
             payload = Payload(
                 id="INTERACTIVE",
                 module=mod_enum,
-                name="User input",
+                name="Пользовательский ввод",
                 prompt=user_input,
             )
             result = module.analyze_response(payload, response)
@@ -204,21 +183,20 @@ def main() -> None:
                 found_any = True
                 sev = result.severity.value.upper()
                 sev_colour = RED if sev in ("CRITICAL", "HIGH") else YELLOW
-                print(f"\n  {red('VULNERABLE')} [{name}]")
-                print(f"  Severity : {sev_colour}{sev}{RESET}")
+                print(f"\n  {red('УЯЗВИМОСТЬ')} [{name}]")
+                print(f"  Уровень серьезности : {sev_colour}{sev}{RESET}")
                 for ev in result.evidence:
-                    print(f"  Evidence : {dim(ev)}")
+                    print(f"  Доказательство      : {dim(ev)}")
             else:
-                print(f"\n  {green('SAFE')}       [{name}]")
+                print(f"\n  {green('БЕЗОПАСНО')}   [{name}]")
 
         print()
         sep()
         if found_any:
-            print(red("  WARNING: Vulnerabilities detected in the LLM response."))
+            print(red("  ВНИМАНИЕ: В ответе LLM обнаружены уязвимости"))
         else:
-            print(green("  Response does not contain signs of vulnerability."))
+            print(green("  Ответ не содержит признаков уязвимостей."))
         sep()
-
 
 if __name__ == "__main__":
     main()
