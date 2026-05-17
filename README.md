@@ -421,7 +421,7 @@ GitHub Actions pipeline запускается при каждом push в `main
 | **Unit Tests** | push / PR | pytest на Python 3.11 и 3.12 с покрытием |
 | **Security Scan** | push / PR | bandit (SAST), pip-audit |
 | **Docker Build & Push** | push в `main` | Сборка и публикация образа в GHCR |
-```
+
 
 ---
 
