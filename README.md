@@ -458,14 +458,14 @@ coursework_iu8-23M/
 │       ├── models.py               # Pydantic модели данных
 │       ├── orchestrator.py         # координатор сканирования
 │       ├── payload_storage.py      # загрузка payload из YAML
-│       └── report.py              # генерация HTML/JSON отчетов
+│       └── report.py               # генерация HTML/JSON отчетов
 ├── tests/
 │   ├── conftest.py                 # pytest фикстуры
 │   ├── test_analyzer.py
 │   ├── test_payload_storage.py
 │   ├── test_quick.py
 │   ├── test_real_llm.py            # интеграционные тесты
-│   └── test_resp.py               # интерактивный тестер
+│   └── test_resp.py                # интерактивный тестер
 ├── .gitignore
 ├── config.yaml                     # конфигурация по умолчанию
 ├── docker-compose.yml
